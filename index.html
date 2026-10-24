@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tzuki — KenDoKan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --rojo: #dc2626; --rojo-bright: #ef4444;
+    --azul: #1d4ed8; --azul-bright: #3b82f6;
+  }
+  body {
+    background: #000; color: #fff; height: 100vh; overflow: hidden;
+    font-family: 'Oswald', 'Arial Black', sans-serif;
+  }
+  .header {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10; padding: 14px 0;
+    text-align: center; text-transform: uppercase; letter-spacing: 8px; font-size: 1rem; color: #475569;
+    background: linear-gradient(to bottom, rgba(0,0,0,.9), transparent); pointer-events: none;
+  }
+  .arena { display: flex; height: 100vh; }
+  .lado {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; transition: box-shadow .15s;
+  }
+  .lado-rojo { background: radial-gradient(ellipse at center, #3b0000 0%, #0d0000 70%); border-right: 1px solid #7f1d1d; }
+  .lado-azul { background: radial-gradient(ellipse at center, #00003b 0%, #00000d 70%); border-left: 1px solid #1e3a8a; }
+  .bg-letra { position: absolute; font-size: min(60vw, 90vh); font-weight: 900; opacity: .05; user-select: none; line-height: 1; }
+  .lado-rojo .bg-letra { color: var(--rojo); }
+  .lado-azul .bg-letra { color: var(--azul); }
+  .color-label { font-size: clamp(2.5rem, 6vw, 6rem); letter-spacing: 6px; text-transform: uppercase; position: relative; z-index: 2; margin-bottom: 8px; }
+  .lado-rojo .color-label { color: var(--rojo-bright); }
+  .lado-azul .color-label { color: var(--azul-bright); }
+  .score { font-size: clamp(5rem, 14vw, 12rem); font-weight: 700; line-height: 1; position: relative; z-index: 2; }
+  .lado-rojo .score { color: #fca5a5; }
+  .lado-azul .score { color: #93c5fd; }
+  .lado.ganador { animation: flashSide .4s ease; }
+  .lado-rojo.ganador { box-shadow: inset 0 0 120px rgba(239,68,68,.35); }
+  .lado-azul.ganador { box-shadow: inset 0 0 120px rgba(59,130,246,.35); }
+  @keyframes flashSide { 0% { filter: brightness(2.5); } 100% { filter: brightness(1); } }
+  .sep {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 3px; height: 100%; z-index: 5;
+    background: linear-gradient(to bottom, transparent, #334155 20%, #334155 80%, transparent);
+  }
+  .pill {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 20;
+    background: rgba(0,0,0,.75); border: 1px solid #334155; border-radius: 999px; padding: 10px 28px;
+    font-size: .85rem; letter-spacing: 4px; color: #64748b; text-transform: uppercase; white-space: nowrap;
+    pointer-events: none; backdrop-filter: blur(10px);
+  }
+  .pill.listo { color: #22c55e; border-color: #166534; }
+  .overlay {
+    position: fixed; inset: 0; z-index: 100; display: none; flex-direction: column;
+    align-items: center; justify-content: center; animation: fadeOverlay .2s ease;
+  }
+  .overlay.visible { display: flex; }
+  .overlay.rojo { background: rgba(100,0,0,.93); }
+  .overlay.azul { background: rgba(0,0,100,.93); }
+  @keyframes fadeOverlay { from { opacity: 0; } to { opacity: 1; } }
+  .ov-label { font-size: clamp(.9rem, 2.5vw, 1.6rem); letter-spacing: 10px; color: rgba(255,255,255,.45); text-transform: uppercase; margin-bottom: 4px; }
+  .ov-nombre { font-size: clamp(5rem, 22vw, 16rem); font-weight: 900; line-height: 1; letter-spacing: 4px; animation: pulso .55s ease-in-out infinite alternate; }
+  .overlay.rojo .ov-nombre { color: #fca5a5; text-shadow: 0 0 80px #ef4444; }
+  .overlay.azul .ov-nombre { color: #93c5fd; text-shadow: 0 0 80px #3b82f6; }
+  @keyframes pulso { from { transform: scale(1); } to { transform: scale(1.05); } }
+
+  .botones { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 96vw; }
+  .btn {
+    padding: 10px 22px; font-family: 'Oswald', sans-serif; font-size: .85rem; font-weight: 700;
+    letter-spacing: 3px; text-transform: uppercase; border: 1px solid #334155; border-radius: 8px;
+    background: rgba(0,0,0,.7); color: #64748b; cursor: pointer; backdrop-filter: blur(8px); transition: all .15s;
+  }
+  .btn:hover { border-color: #94a3b8; color: #fff; background: rgba(255,255,255,.08); }
+  .btn.conectar { border-color: #22c55e88; color: #22c55e; }
+  .btn.activo { border-color: #f59e0b; color: #f59e0b; }
+
+  .cnx { position: fixed; top: 12px; right: 16px; z-index: 300; font-size: .75rem; letter-spacing: 3px; color: #475569; }
+  .cnx.ok { color: #22c55e; }
+  .cnx.err { color: #ef4444; }
+  .aviso { position: fixed; top: 44px; right: 16px; z-index: 300; font-size: .65rem; letter-spacing: 2px; color: #f59e0b; text-align: right; max-width: 60vw; }
+
+  .historial {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(340px, 90vw); z-index: 400;
+    background: #0f172aee; border-left: 1px solid #334155; padding: 56px 20px 20px; overflow-y: auto;
+    transform: translateX(100%); transition: transform .2s; backdrop-filter: blur(8px);
+  }
+  .historial.visible { transform: none; }
+  .historial h2 { font-size: 1rem; letter-spacing: 5px; color: #94a3b8; text-transform: uppercase; margin-bottom: 16px; }
+  .historial li { list-style: none; display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1e293b; letter-spacing: 3px; font-size: .95rem; }
+  .historial li.A b { color: var(--rojo-bright); }
+  .historial li.B b { color: var(--azul-bright); }
+  .historial li span { color: #64748b; }
+  .vacio { color: #475569; letter-spacing: 3px; font-size: .8rem; }
+</style>
+</head>
+<body>
+
+<div class="header">KenDoKan · Detector de Tzuki</div>
+
+<div class="arena">
+  <div class="lado lado-rojo" id="lado-A">
+    <div class="bg-letra">A</div>
+    <div class="color-label">Aka</div>
+    <div class="score" id="pts-A">0</div>
+  </div>
+  <div class="lado lado-azul" id="lado-B">
+    <div class="bg-letra">B</div>
+    <div class="color-label">Ao</div>
+    <div class="score" id="pts-B">0</div>
+  </div>
+</div>
+<div class="sep"></div>
+<div class="pill" id="pill">SIN CONEXIÓN</div>
+
+<div class="overlay" id="overlay" onclick="cerrarOverlay()">
+  <div class="ov-label">Punto para</div>
+  <div class="ov-nombre" id="ov-nombre">AKA</div>
+</div>
+
+<div class="botones">
+  <button class="btn conectar" id="btn-conectar" onclick="alternarConexion()">&#9889; Conectar</button>
+  <button class="btn" onclick="cerrarOverlay()">&#9654; Continuar</button>
+  <button class="btn" onclick="resetear()">&#8635; Resetear</button>
+  <button class="btn" onclick="alternarHistorial()">&#9776; Historial</button>
+  <button class="btn" id="btn-sonido" onclick="alternarSonido()">&#128266; Sonido</button>
+  <button class="btn" id="btn-sim" onclick="alternarSim()">&#9881; Simulación</button>
+  <button class="btn" onclick="pantallaCompleta()">&#9974; Pantalla completa</button>
+</div>
+
+<div class="cnx err" id="cnx">&#9679; DESCONECTADO</div>
+<div class="aviso" id="aviso"></div>
+
+<div class="historial" id="historial">
+  <h2>Historial</h2>
+  <ul id="lista"></ul>
+  <p class="vacio" id="vacio">Sin rondas todavía</p>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const pts = { A: 0, B: 0 };
+const rondas = [];
+let estado = 'desconocido';          // desconocido | idle | listo | ganador
+let sim = false, sonido = true;
+
+// ── Parser (acepta formato EVT: y el texto original) ──
+function parseLine(raw) {
+  const line = raw.trim();
+  let m;
+  if ((m = line.match(/^EVT:GANADOR:([AB])$/)) || (m = line.match(/^Ganador:\s*([AB])$/)))
+    return { type: 'winner', id: m[1] };
+  if (line === 'EVT:LISTO' || /LISTO!/.test(line)) return { type: 'ready' };
+  if (line === 'EVT:BOOT' || /Toca el sensor/.test(line)) return { type: 'idle' };
+  return { type: 'log', line };
+}
+
+function manejar(ev) {
+  if (ev.type === 'ready') ponerEstado('listo');
+  else if (ev.type === 'idle') ponerEstado('idle');
+  else if (ev.type === 'winner') ganador(ev.id);
+}
+
+function ponerEstado(e) {
+  estado = e;
+  cerrarOverlay();
+  quitarGanador();
+  const p = $('pill');
+  p.className = 'pill' + (e === 'listo' ? ' listo' : '');
+  p.textContent = { desconocido: 'SIN CONEXIÓN', idle: 'TOCA EL SENSOR', listo: 'LISTO', ganador: 'GOLPE' }[e];
+}
+
+function ganador(id) {
+  if (estado === 'ganador') return;       // espejo del receptor: ignora hasta el próximo "listo"
+  estado = 'ganador';
+  pts[id]++;
+  $('pts-' + id).textContent = pts[id];
+  quitarGanador();
+  $('lado-' + id).classList.add('ganador');
+  $('overlay').className = 'overlay visible ' + (id === 'A' ? 'rojo' : 'azul');
+  $('ov-nombre').textContent = id === 'A' ? 'AKA' : 'AO';
+  $('pill').className = 'pill';
+  $('pill').textContent = 'GOLPE';
+  rondas.unshift({ id, hora: new Date().toLocaleTimeString('es-CL') });
+  pintarHistorial();
+  pitido(id);
+}
+
+function quitarGanador() { ['A', 'B'].forEach(i => $('lado-' + i).classList.remove('ganador')); }
+function cerrarOverlay() { $('overlay').className = 'overlay'; }
+
+function resetear() {
+  pts.A = pts.B = 0;
+  $('pts-A').textContent = $('pts-B').textContent = '0';
+  rondas.length = 0;
+  pintarHistorial();
+  quitarGanador();
+  cerrarOverlay();
+}
+
+// ── Historial ──
+function pintarHistorial() {
+  $('vacio').style.display = rondas.length ? 'none' : '';
+  $('lista').innerHTML = rondas.map((r, i) =>
+    `<li class="${r.id}"><b>${rondas.length - i}. ${r.id === 'A' ? 'AKA' : 'AO'}</b><span>${r.hora}</span></li>`).join('');
+}
+function alternarHistorial() { $('historial').classList.toggle('visible'); }
+
+// ── Sonido (Web Audio) ──
+let audio;
+function pitido(id) {
+  if (!sonido) return;
+  try {
+    audio = audio || new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.frequency.value = id === 'A' ? 880 : 660;
+    o.type = 'square';
+    g.gain.setValueAtTime(.15, audio.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, audio.currentTime + .35);
+    o.connect(g).connect(audio.destination);
+    o.start(); o.stop(audio.currentTime + .35);
+  } catch (e) {}
+}
+function alternarSonido() {
+  sonido = !sonido;
+  $('btn-sonido').classList.toggle('activo', !sonido);
+  $('btn-sonido').innerHTML = sonido ? '&#128266; Sonido' : '&#128263; Mudo';
+}
+
+// ── Simulación: Espacio = tocar sensor, A / B = golpes ──
+function alternarSim() {
+  sim = !sim;
+  $('btn-sim').classList.toggle('activo', sim);
+  $('aviso').textContent = sim ? 'SIMULACIÓN: ESPACIO = ARMAR · A = AKA · B = AO' : '';
+  if (sim) ponerEstado('idle'); else if (!puerto) ponerEstado('desconocido');
+}
+document.addEventListener('keydown', e => {
+  if (!sim) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); ponerEstado('listo'); }
+  else if (k === 'a' || k === 'b') { if (estado === 'listo') ganador(k.toUpperCase()); }
+});
+
+function pantallaCompleta() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen();
+}
+
+// ── Web Serial ──
+let puerto = null, lector = null, leyendo = false;
+
+function conexion(ok) {
+  const c = $('cnx');
+  c.textContent = ok ? '● EN LÍNEA' : '● DESCONECTADO';
+  c.className = 'cnx ' + (ok ? 'ok' : 'err');
+  $('btn-conectar').innerHTML = ok ? '&#10006; Desconectar' : '&#9889; Conectar';
+}
+
+async function alternarConexion() {
+  if (puerto) return cerrarPuerto();
+  if (!('serial' in navigator)) {
+    $('aviso').textContent = 'WEB SERIAL SOLO FUNCIONA EN CHROME / EDGE DE ESCRITORIO';
+    return;
+  }
+  try { await abrirPuerto(await navigator.serial.requestPort()); }
+  catch (e) { if (e.name !== 'NotFoundError') $('aviso').textContent = 'NO SE PUDO ABRIR: ' + e.message; }
+}
+
+async function abrirPuerto(p) {
+  await p.open({ baudRate: 115200 });
+  try { await p.setSignals({ dataTerminalReady: false, requestToSend: false }); } catch (e) {}
+  puerto = p;
+  $('aviso').textContent = '';
+  conexion(true);
+  ponerEstado('idle');
+  leer(p);
+}
+
+async function leer(p) {
+  leyendo = true;
+  const decoder = new TextDecoderStream();
+  const cierre = p.readable.pipeTo(decoder.writable).catch(() => {});
+  lector = decoder.readable.getReader();
+  let buffer = '';
+  try {
+    while (leyendo) {
+      const { value, done } = await lector.read();
+      if (done) break;
+      buffer += value;
+      let i;
+      while ((i = buffer.indexOf('\n')) >= 0) {
+        manejar(parseLine(buffer.slice(0, i)));
+        buffer = buffer.slice(i + 1);
+      }
+    }
+  } catch (e) {
+    // cable desconectado o error de lectura
+  } finally {
+    try { lector.releaseLock(); } catch (e) {}
+    await cierre;
+    try { await p.close(); } catch (e) {}
+    if (puerto === p) desconectado();
+  }
+}
+
+async function cerrarPuerto() {
+  leyendo = false;
+  try { await lector.cancel(); } catch (e) {}
+}
+
+function desconectado() {
+  puerto = null; lector = null; leyendo = false;
+  conexion(false);
+  if (!sim) ponerEstado('desconocido');
+}
+
+if ('serial' in navigator) {
+  navigator.serial.addEventListener('disconnect', () => { leyendo = false; if (puerto) desconectado(); });
+  // reconexión automática a un puerto ya autorizado
+  navigator.serial.getPorts().then(ps => { if (ps.length) abrirPuerto(ps[0]).catch(() => {}); });
+}
+pintarHistorial();
+</script>
+</body>
+</html>
